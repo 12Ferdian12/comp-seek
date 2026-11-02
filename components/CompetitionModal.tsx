@@ -103,6 +103,9 @@ export default function CompetitionModal({
               )}
 
               <span className="text-zinc-400">{competition.type}</span>
+              {competition.rating && (
+                <span className="text-amber-300">★ {competition.rating}</span>
+              )}
               <span className="text-zinc-600">•</span>
               <span className="text-zinc-400">{competition.year}</span>
             </div>

@@ -12,6 +12,7 @@ export interface Competition {
   eligibility: string;
   teamFormat?: string;
   teamSize?: string;
+  rating?: string;
   regOpen?: string;
   deadline: string;
   eventDate?: string;
@@ -32,4 +33,6 @@ export interface Competition {
 
 export type FilterField = 'All' | 'Informatika' | 'Elektro' | 'Both';
 export type FilterStatus = 'All' | 'Open' | 'Upcoming' | 'Closed';
+export type FilterFee = 'All' | 'Free';
+export type FilterParticipation = 'All' | 'Individual' | 'Team';
 export type SelectedSheet = 'All' | SheetCategory;

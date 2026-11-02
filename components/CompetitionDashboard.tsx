@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
-import { Competition, FilterField, FilterStatus, SelectedSheet, SheetCategory } from '@/lib/types';
+import { Competition, FilterFee, FilterField, FilterParticipation, FilterStatus, SelectedSheet } from '@/lib/types';
+import { isFreeCompetition, matchesParticipation } from '@/lib/filters';
 import CompetitionCard from './CompetitionCard';
 import CompetitionModal from './CompetitionModal';
 import StatSummary from './StatSummary';
@@ -29,6 +30,8 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
   const [search, setSearch] = useState('');
   const [fieldFilter, setFieldFilter] = useState<FilterField>('All');
   const [statusFilter, setStatusFilter] = useState<FilterStatus>('All');
+  const [feeFilter, setFeeFilter] = useState<FilterFee>('All');
+  const [participationFilter, setParticipationFilter] = useState<FilterParticipation>('All');
   const [savedOnly, setSavedOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'deadline' | 'name' | 'year'>('deadline');
   const [selectedComp, setSelectedComp] = useState<Competition | null>(null);
@@ -104,6 +107,16 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
           if (comp.status !== statusFilter) return false;
         }
 
+        // Free registration filter
+        if (feeFilter === 'Free' && !isFreeCompetition(comp)) {
+          return false;
+        }
+
+        // Participation filter
+        if (!matchesParticipation(comp, participationFilter)) {
+          return false;
+        }
+
         // Bookmark filter
         if (savedOnly) {
           if (!bookmarks.includes(comp.id)) return false;
@@ -123,7 +136,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
         const bDate = b.deadline.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0] || '9999-99-99';
         return aDate.localeCompare(bDate);
       });
-  }, [initialCompetitions, selectedSheet, search, fieldFilter, statusFilter, savedOnly, sortBy, bookmarks]);
+  }, [initialCompetitions, selectedSheet, search, fieldFilter, statusFilter, feeFilter, participationFilter, savedOnly, sortBy, bookmarks]);
 
   const sheetUrl = useMemo(() => {
     if (selectedSheet === 'CS-Competition') {
@@ -370,6 +383,29 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
                   {s}
                 </button>
               ))}
+              {(['All', 'Individual', 'Team'] as FilterParticipation[]).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setParticipationFilter(p)}
+                  className={`px-3 py-1 text-xs font-mono border transition-colors ${
+                    participationFilter === p
+                      ? 'border-sky-400 text-sky-300 bg-sky-400/10 font-bold'
+                      : 'border-white/10 text-zinc-400 hover:border-white/30 hover:text-white bg-[#090D12]'
+                  }`}
+                >
+                  {p === 'All' ? 'ALL FORMAT' : p.toUpperCase()}
+                </button>
+              ))}
+              <button
+                onClick={() => setFeeFilter(feeFilter === 'Free' ? 'All' : 'Free')}
+                className={`px-3 py-1 text-xs font-mono border transition-colors ${
+                  feeFilter === 'Free'
+                    ? 'border-[#A4FF01] text-black bg-[#A4FF01] font-bold'
+                    : 'border-white/10 text-zinc-400 hover:border-white/30 hover:text-white bg-[#090D12]'
+                }`}
+              >
+                GRATIS
+              </button>
             </div>
           </div>
         </div>
@@ -380,12 +416,14 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
             SHOWING <span className="text-[#A4FF01] font-bold">{filtered.length}</span> OF{' '}
             <span className="text-white">{initialCompetitions.length}</span> COMPETITIONS
           </div>
-          {(search || fieldFilter !== 'All' || statusFilter !== 'All' || savedOnly) && (
+          {(search || fieldFilter !== 'All' || statusFilter !== 'All' || feeFilter !== 'All' || participationFilter !== 'All' || savedOnly) && (
             <button
               onClick={() => {
                 setSearch('');
                 setFieldFilter('All');
                 setStatusFilter('All');
+                setFeeFilter('All');
+                setParticipationFilter('All');
                 setSavedOnly(false);
               }}
               className="text-[#A4FF01] hover:underline"
@@ -418,6 +456,8 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
                 setSearch('');
                 setFieldFilter('All');
                 setStatusFilter('All');
+                setFeeFilter('All');
+                setParticipationFilter('All');
                 setSavedOnly(false);
               }}
               className="mt-4 px-4 py-2 text-xs font-mono border border-[#A4FF01] text-[#A4FF01] hover:bg-[#A4FF01]/10 transition-colors"

@@ -33,6 +33,14 @@ function normalizeStatus(raw: string): 'Open' | 'Upcoming' | 'Closed' {
   return 'Open';
 }
 
+function normalizeTeamFormat(raw: string): string {
+  const value = raw.trim();
+  if (/individual\s*\/\s*team|individual\s+or\s+team|solo.*team|team.*solo/i.test(value)) return 'Individual / Team';
+  if (/individual|solo|perseorangan/i.test(value)) return 'Individual';
+  if (/team|tim/i.test(value)) return 'Team';
+  return '';
+}
+
 async function fetchSheetCsv(gid: string): Promise<Record<string, string>[]> {
   const res = await fetch(`${BASE_URL}&gid=${gid}`, {
     next: { revalidate: 3600, tags: ['competitions'] },
@@ -78,6 +86,7 @@ export async function getCompetitions(): Promise<Competition[]> {
       field: 'Informatika',
       type: row['Category']?.trim() || 'Coding Contest',
       eligibility: row['Target Participants']?.trim() || 'Mahasiswa / Umum',
+      teamFormat: normalizeTeamFormat(row['Team Format'] || row['Individual / Team'] || row['Target Participants'] || ''),
       deadline: row['Registration Deadline']?.trim() || '',
       regOpen: row['Registration Open']?.trim() || '-',
       eventDate: row['Event Date']?.trim() || '-',
@@ -87,6 +96,7 @@ export async function getCompetitions(): Promise<Competition[]> {
       location,
       prize: row['Prize']?.trim() || '-',
       fee: row['Registration Fee']?.trim() || 'Free / Unspecified',
+      rating: row['Rating']?.trim() || row['Relevance Score']?.trim() || '',
       officialUrl: row['Source Link']?.trim() || '',
       regUrl: row['Registration Link']?.trim() || row['Source Link']?.trim() || '',
       status: normalizeStatus(rawStatus),
@@ -114,6 +124,7 @@ export async function getCompetitions(): Promise<Competition[]> {
       field: 'Both',
       type: row['Competition Type']?.trim() || 'Hardware & Software Contest',
       eligibility: row['Eligibility']?.trim() || '-',
+      teamFormat: normalizeTeamFormat(row['Team Format'] || row['Individual / Team'] || row['Eligibility'] || ''),
       deadline: row['Registration Deadline']?.trim() || '',
       regOpen: row['Registration Start']?.trim() || '-',
       eventDate: row['Competition Date']?.trim() || '-',
@@ -123,6 +134,7 @@ export async function getCompetitions(): Promise<Competition[]> {
       location,
       prize: row['Prize']?.trim() || '-',
       fee: row['Registration Fee']?.trim() || 'Free / Unspecified',
+      rating: row['Rating']?.trim() || row['Relevance Score']?.trim() || '',
       officialUrl: row['Official Website']?.trim() || row['Source URL']?.trim() || '',
       regUrl: row['Official Website']?.trim() || row['Source URL']?.trim() || '',
       status: normalizeStatus(rawStatus),
@@ -160,6 +172,7 @@ export async function getCompetitions(): Promise<Competition[]> {
       location: row['Location / Format']?.trim() || 'Online / In-person',
       prize: row['Prize / Awards']?.trim() || '-',
       fee: row['Registration Fee']?.trim() || 'Free / Unspecified',
+      rating: row['Rating']?.trim() || row['Relevance Score']?.trim() || '',
       officialUrl: row['Official Website']?.trim() || '',
       regUrl: row['Registration Link']?.trim() || '',
       status: normalizeStatus(rawStatus),

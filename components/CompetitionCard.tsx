@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Competition } from '@/lib/types';
-import { Calendar, MapPin, Trophy, Bookmark, ArrowUpRight } from 'lucide-react';
+import { Calendar, MapPin, Trophy, Bookmark, ArrowUpRight, Star } from 'lucide-react';
 
 interface Props {
   competition: Competition;
@@ -102,7 +102,15 @@ export default function CompetitionCard({
         <h3 className="text-base font-bold text-white group-hover:text-[#A4FF01] transition-colors leading-snug line-clamp-2">
           {competition.name}
         </h3>
-        <p className="text-xs text-zinc-400 mt-1 line-clamp-1">{competition.organizer}</p>
+        <div className="flex items-center justify-between gap-2 mt-1">
+          <p className="text-xs text-zinc-400 line-clamp-1">{competition.organizer}</p>
+          {competition.rating && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-amber-300 shrink-0">
+              <Star className="w-3 h-3 fill-current" />
+              {competition.rating}
+            </span>
+          )}
+        </div>
 
         {/* Topics excerpt */}
         <p className="text-xs text-zinc-300 mt-3 line-clamp-2 leading-relaxed bg-black/40 p-2.5 border border-white/5 font-mono">
