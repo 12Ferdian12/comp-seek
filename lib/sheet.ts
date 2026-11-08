@@ -27,9 +27,9 @@ export const SHEET_CONFIG: { category: SheetCategory; gid: string; label: string
 function normalizeStatus(raw: string): 'Open' | 'Upcoming' | 'Closed' {
   const s = (raw || '').toLowerCase().trim();
   if (!s) return 'Upcoming';
-  if (s.includes('open') || s.includes('accepting') || s.includes('underway')) return 'Open';
-  if (s.includes('upcoming') || s.includes('soon') || s.includes('opening')) return 'Upcoming';
   if (s.includes('closed') || s.includes('ended') || s.includes('past')) return 'Closed';
+  if (s.includes('upcoming') || s.includes('soon') || s.includes('opening')) return 'Upcoming';
+  if (s.includes('open') || s.includes('accepting') || s.includes('underway')) return 'Open';
   return 'Open';
 }
 
@@ -182,5 +182,5 @@ export async function getCompetitions(): Promise<Competition[]> {
     });
   });
 
-  return competitions;
+  return competitions.filter((competition) => competition.status !== 'Closed');
 }

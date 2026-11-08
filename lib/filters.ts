@@ -1,5 +1,11 @@
 import { Competition } from './types';
 
+export function isCompetitionActive(competition: Competition, now: number): boolean {
+  if (competition.status === 'Closed') return false;
+  const date = competition.deadline.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0];
+  return !date || now <= Date.parse(`${date}T23:59:59.999Z`);
+}
+
 const FREE_FEE_PATTERN = /(^|[^a-z])(free|gratis|no\b.*\bfee|tanpa\s+biaya|rp\s*0(?:\D|$)|0\s*(?:idr|rupiah)?)([^a-z]|$)/i;
 
 export function isFreeCompetition(competition: Competition): boolean {

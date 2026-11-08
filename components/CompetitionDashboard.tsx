@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Competition, FilterFee, FilterField, FilterParticipation, FilterStatus, SelectedSheet } from '@/lib/types';
-import { isFreeCompetition, matchesParticipation } from '@/lib/filters';
+import { isCompetitionActive, isFreeCompetition, matchesParticipation } from '@/lib/filters';
 import CompetitionCard from './CompetitionCard';
 import CompetitionModal from './CompetitionModal';
 import StatSummary from './StatSummary';
@@ -10,7 +10,6 @@ import {
   Search,
   SlidersHorizontal,
   Bookmark,
-  RefreshCw,
   ExternalLink,
   Sparkles,
   Terminal,
@@ -18,14 +17,12 @@ import {
   BookOpen,
   LayoutGrid
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
 
 interface Props {
   initialCompetitions: Competition[];
 }
 
 export default function CompetitionDashboard({ initialCompetitions }: Props) {
-  const router = useRouter();
   const [selectedSheet, setSelectedSheet] = useState<SelectedSheet>('All');
   const [search, setSearch] = useState('');
   const [fieldFilter, setFieldFilter] = useState<FilterField>('All');
@@ -36,14 +33,24 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
   const [sortBy, setSortBy] = useState<'deadline' | 'name' | 'year'>('deadline');
   const [selectedComp, setSelectedComp] = useState<Competition | null>(null);
   const [bookmarks, setBookmarks] = useState<string[]>([]);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [currentTime, setCurrentTime] = useState<number | null>(null);
+
+  useEffect(() => {
+    setCurrentTime(Date.now());
+  }, []);
 
   // Sync bookmarks from localStorage
   useEffect(() => {
     try {
       const saved = localStorage.getItem('comp_bookmarks');
       if (saved) {
-        setBookmarks(JSON.parse(saved));
+        const validIds = new Set(initialCompetitions.map((competition) => competition.id));
+        const stored = JSON.parse(saved);
+        const validBookmarks = Array.isArray(stored)
+          ? stored.filter((id): id is string => typeof id === 'string' && validIds.has(id))
+          : [];
+        setBookmarks(validBookmarks);
+        localStorage.setItem('comp_bookmarks', JSON.stringify(validBookmarks));
       }
     } catch {
       // ignore storage access issues
@@ -62,21 +69,10 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
     });
   };
 
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-      await fetch('/api/revalidate');
-      router.refresh();
-    } catch {
-      alert('Gagal merefresh cache spreadsheet');
-    } finally {
-      setTimeout(() => setIsRefreshing(false), 800);
-    }
-  };
-
   // Filter & sort competitions
   const filtered = useMemo(() => {
     return initialCompetitions
+      .filter((comp) => currentTime === null || isCompetitionActive(comp, currentTime))
       .filter((comp) => {
         // Sheet category filter
         if (selectedSheet !== 'All' && comp.sheetCategory !== selectedSheet) {
@@ -136,7 +132,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
         const bDate = b.deadline.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0] || '9999-99-99';
         return aDate.localeCompare(bDate);
       });
-  }, [initialCompetitions, selectedSheet, search, fieldFilter, statusFilter, feeFilter, participationFilter, savedOnly, sortBy, bookmarks]);
+  }, [initialCompetitions, selectedSheet, search, fieldFilter, statusFilter, feeFilter, participationFilter, savedOnly, sortBy, bookmarks, currentTime]);
 
   const sheetUrl = useMemo(() => {
     if (selectedSheet === 'CS-Competition') {
@@ -177,16 +173,6 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono border border-white/10 hover:border-white/30 text-zinc-300 hover:text-white transition-colors disabled:opacity-50"
-              title="Refresh spreadsheet cache"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-[#A4FF01]' : ''}`} />
-              <span className="hidden sm:inline">SYNC SHEET</span>
-            </button>
-
             <a
               href={sheetUrl}
               target="_blank"
@@ -366,7 +352,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
               <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider mr-1">
                 STATUS:
               </span>
-              {(['All', 'Open', 'Upcoming', 'Closed'] as FilterStatus[]).map((s) => (
+              {(['All', 'Open', 'Upcoming'] as FilterStatus[]).map((s) => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
