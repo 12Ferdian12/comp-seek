@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import { formatDaysLeft, getDaysLeft } from '@/lib/filters';
 import { Competition } from '@/lib/types';
 import { Calendar, MapPin, Trophy, Bookmark, ArrowUpRight, Star } from 'lucide-react';
 
@@ -9,6 +9,7 @@ interface Props {
   onSelect: (comp: Competition) => void;
   isBookmarked: boolean;
   onToggleBookmark: (id: string) => void;
+  now: number | null;
 }
 
 export default function CompetitionCard({
@@ -16,29 +17,24 @@ export default function CompetitionCard({
   onSelect,
   isBookmarked,
   onToggleBookmark,
+  now,
 }: Props) {
-  // Format remaining days if ISO format
-  const [mounted, setMounted] = React.useState(false);
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  const getDaysLeft = (deadlineStr: string) => {
-    if (!mounted || !deadlineStr || deadlineStr.toLowerCase().includes('not specified')) return null;
-    const match = deadlineStr.match(/\b\d{4}-\d{2}-\d{2}\b/);
-    if (!match) return null;
-    const target = new Date(match[0]).getTime();
-    const now = Date.now();
-    const diff = Math.ceil((target - now) / (1000 * 60 * 60 * 24));
-    return diff;
-  };
-
-  const daysLeft = getDaysLeft(competition.deadline);
+  const daysLeft = competition.deadlineDate && now !== null
+    ? getDaysLeft(competition.deadlineDate, now)
+    : null;
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => onSelect(competition)}
+      onKeyDown={(event) => {
+        if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          onSelect(competition);
+        }
+      }}
+      aria-label={`View details for ${competition.name}`}
       className="group relative bg-[#090D12] border border-white/10 hover:border-[#A4FF01]/60 p-5 flex flex-col justify-between transition-all duration-200 cursor-pointer hover:shadow-[0_0_20px_rgba(164,255,1,0.06)]"
     >
       <div>
@@ -92,6 +88,7 @@ export default function CompetitionCard({
                   : 'border-white/5 text-zinc-500 hover:text-white hover:border-white/20'
               }`}
               title="Bookmark"
+              aria-label={`${isBookmarked ? 'Remove' : 'Add'} bookmark for ${competition.name}`}
             >
               <Bookmark className="w-3.5 h-3.5 fill-current" />
             </button>
@@ -133,14 +130,16 @@ export default function CompetitionCard({
             {daysLeft !== null && (
               <span
                 className={`ml-2 text-[10px] px-1.5 py-0.2 border ${
-                  daysLeft <= 7
+                  daysLeft <= 0
                     ? 'border-rose-500 text-rose-400 bg-rose-500/10'
+                    : daysLeft <= 7
+                    ? 'border-amber-400 text-amber-300 bg-amber-400/10'
                     : daysLeft <= 30
                     ? 'border-amber-400 text-amber-300 bg-amber-400/10'
                     : 'border-[#A4FF01]/40 text-[#A4FF01] bg-[#A4FF01]/5'
                 }`}
               >
-                {daysLeft < 0 ? 'Closed' : `${daysLeft}d left`}
+                {formatDaysLeft(daysLeft)}
               </span>
             )}
           </div>

@@ -15,6 +15,8 @@ export interface Competition {
   rating?: string;
   regOpen?: string;
   deadline: string;
+  /** ISO YYYY-MM-DD parsed from `deadline`; '' when unknown. */
+  deadlineDate: string;
   eventDate?: string;
   topics?: string;
   description?: string;
@@ -32,7 +34,7 @@ export interface Competition {
 }
 
 export type FilterField = 'All' | 'Informatika' | 'Elektro' | 'Both';
-export type FilterStatus = 'All' | 'Open' | 'Upcoming' | 'Closed';
+export type FilterStatus = 'All' | 'Open' | 'Upcoming';
 export type FilterFee = 'All' | 'Free';
 export type FilterParticipation = 'All' | 'Individual' | 'Team';
 export type SelectedSheet = 'All' | SheetCategory;

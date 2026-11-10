@@ -1,12 +1,26 @@
-import { Competition } from './types';
+import type { Competition } from './types';
 
 export function isCompetitionActive(competition: Competition, now: number): boolean {
   if (competition.status === 'Closed') return false;
-  const date = competition.deadline.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0];
+  const date = competition.deadlineDate;
   return !date || now <= Date.parse(`${date}T23:59:59.999Z`);
 }
 
-const FREE_FEE_PATTERN = /(^|[^a-z])(free|gratis|no\b.*\bfee|tanpa\s+biaya|rp\s*0(?:\D|$)|0\s*(?:idr|rupiah)?)([^a-z]|$)/i;
+export function getDaysLeft(deadlineDate: string, now: number): number {
+  const [y, m, d] = deadlineDate.split('-').map(Number);
+  const target = new Date(y, m - 1, d);
+  const nowDate = new Date(now);
+  const today = new Date(nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate());
+  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+}
+
+export function formatDaysLeft(days: number): string {
+  if (days < 0) return 'Closed';
+  if (days === 0) return 'Hari Ini';
+  return `${days}d left`;
+}
+
+const FREE_FEE_PATTERN = /\b(free|gratis)\b|\bno\b.*\bfee\b|tanpa\s+biaya|(?:\brp|\busd|\$)\s*0(?![\d.,])/i;
 
 export function isFreeCompetition(competition: Competition): boolean {
   const fee = competition.fee.trim();

@@ -11,14 +11,14 @@ UI/UX: Minimalis arsitektural, dark theme, kontras tinggi (inspirasi Dribbble Qu
   3. `Paper-Competition` (`gid=2117962469`): Student Research, Call for Papers, Conference Tracks.
 - **Mekanisme Sync:** Fetch endpoint CSV paralel ketiga tab langsung:
   `https://docs.google.com/spreadsheets/d/1xq0oASCqNLyXxE5-GaqQp4ZQgPhhRrtDIZLhtldu-70/export?format=csv&gid=<GID>`
-- **Cache Policy:** Next.js ISR (`revalidate: 3600`) + On-demand revalidation route (`/api/revalidate?secret=...`).
+- **Cache Policy:** Next.js ISR (`revalidate: 3600`) + On-demand revalidation route (`POST /api/revalidate?secret=...`, requires `REVALIDATE_SECRET`; returns 401 when unset).
 
 ## 3. Fitur Utama
 1. **Primary Spreadsheet Switcher:** Tab khusus untuk beralih antara `All Spreadsheets`, `CS-Competition`, `CSxEE-Competition`, dan `Paper Competition`.
 2. **Stat Summary:** Breakdown metrik jumlah lomba per tab dan status submission.
 3. **Filter & Search:**
    - Field: All, Informatika, Elektro, Both.
-   - Status: All, Open, Upcoming, Closed.
+   - Status: All, Open, Upcoming. Closed or past-deadline competitions are hidden.
    - Search: Keyword pencarian langsung di judul, penyelenggara, deskripsi, dan topik riset.
    - Sort: Deadline paling dekat, nama A-Z, tahun edisi.
 4. **Card Grid & Architectural Layout:**

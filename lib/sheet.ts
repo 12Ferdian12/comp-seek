@@ -1,5 +1,5 @@
 import Papa from 'papaparse';
-import { Competition, SheetCategory } from './types';
+import type { Competition, SheetCategory } from './types';
 
 const BASE_URL = 'https://docs.google.com/spreadsheets/d/1xq0oASCqNLyXxE5-GaqQp4ZQgPhhRrtDIZLhtldu-70/export?format=csv';
 
@@ -24,7 +24,12 @@ export const SHEET_CONFIG: { category: SheetCategory; gid: string; label: string
   },
 ];
 
-function normalizeStatus(raw: string): 'Open' | 'Upcoming' | 'Closed' {
+// shortcut: ISO dates only (all three sheets use ISO today); add formats if sheet data changes.
+export function normalizeDate(raw: string): string {
+  return raw.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0] ?? '';
+}
+
+export function normalizeStatus(raw: string): 'Open' | 'Upcoming' | 'Closed' {
   const s = (raw || '').toLowerCase().trim();
   if (!s) return 'Upcoming';
   if (s.includes('closed') || s.includes('ended') || s.includes('past')) return 'Closed';
@@ -88,6 +93,7 @@ export async function getCompetitions(): Promise<Competition[]> {
       eligibility: row['Target Participants']?.trim() || 'Mahasiswa / Umum',
       teamFormat: normalizeTeamFormat(row['Team Format'] || row['Individual / Team'] || row['Target Participants'] || ''),
       deadline: row['Registration Deadline']?.trim() || '',
+      deadlineDate: normalizeDate(row['Registration Deadline'] || ''),
       regOpen: row['Registration Open']?.trim() || '-',
       eventDate: row['Event Date']?.trim() || '-',
       description: row['Description']?.trim() || '',
@@ -126,6 +132,7 @@ export async function getCompetitions(): Promise<Competition[]> {
       eligibility: row['Eligibility']?.trim() || '-',
       teamFormat: normalizeTeamFormat(row['Team Format'] || row['Individual / Team'] || row['Eligibility'] || ''),
       deadline: row['Registration Deadline']?.trim() || '',
+      deadlineDate: normalizeDate(row['Registration Deadline'] || ''),
       regOpen: row['Registration Start']?.trim() || '-',
       eventDate: row['Competition Date']?.trim() || '-',
       description: row['CS × EE Relevance']?.trim() || '',
@@ -166,6 +173,7 @@ export async function getCompetitions(): Promise<Competition[]> {
       teamSize: row['Team Size']?.trim() || '-',
       regOpen: row['Registration Opening Date']?.trim() || '-',
       deadline: row['Paper Submission Deadline']?.trim() || '',
+      deadlineDate: normalizeDate(row['Paper Submission Deadline'] || ''),
       eventDate: row['Event Date']?.trim() || '-',
       topics: row['Theme / Research Topics']?.trim() || '-',
       requirements: row['Submission Requirements']?.trim() || '-',

@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { Competition } from '@/lib/types';
 import {
   X,
@@ -29,6 +29,15 @@ export default function CompetitionModal({
   isBookmarked,
   onToggleBookmark,
 }: Props) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+
+  // Native modal dialog: focus trap, Escape, inert background, focus restore on close().
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (competition && dialog && !dialog.open) dialog.showModal();
+  }, [competition]);
+
   if (!competition) return null;
 
   const handleShare = () => {
@@ -39,17 +48,17 @@ export default function CompetitionModal({
         url: competition.officialUrl || window.location.href,
       }).catch(() => {});
     } else {
-      navigator.clipboard.writeText(competition.officialUrl || window.location.href);
-      alert('Link disalin ke clipboard');
+      navigator.clipboard
+        ?.writeText(competition.officialUrl || window.location.href)
+        .then(() => alert('Link disalin ke clipboard'))
+        .catch(() => alert('Gagal menyalin link'));
     }
   };
 
   // Generate Google Calendar Link if deadline exists
   const getGoogleCalendarUrl = () => {
-    if (!competition.deadline || competition.deadline.toLowerCase().includes('not specified')) return null;
-    const cleanDate = competition.deadline.replace(/[^0-9]/g, '');
-    if (cleanDate.length < 8) return null;
-    const dateStr = cleanDate.slice(0, 8); // YYYYMMDD
+    if (!competition.deadlineDate) return null;
+    const dateStr = competition.deadlineDate.replaceAll('-', ''); // YYYYMMDD
     const title = encodeURIComponent(`[DEADLINE] ${competition.name}`);
     const details = encodeURIComponent(
       `Penyelenggara: ${competition.organizer}\nRequirements: ${competition.requirements}\nURL: ${competition.officialUrl}`
@@ -60,13 +69,17 @@ export default function CompetitionModal({
   const gCalUrl = getGoogleCalendarUrl();
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm overflow-y-auto"
-      onClick={onClose}
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      onClose={onClose}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) e.currentTarget.close();
+      }}
+      className="fixed inset-0 z-50 m-0 h-full max-h-none w-full max-w-none border-0 open:flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm backdrop:bg-transparent overflow-y-auto"
     >
       <div
         className="relative w-full max-w-3xl bg-[#0B0F14] border border-white/15 shadow-2xl p-6 sm:p-8 text-zinc-100 my-8"
-        onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header */}
         <div className="flex items-start justify-between gap-4 border-b border-white/10 pb-5">
@@ -110,7 +123,7 @@ export default function CompetitionModal({
               <span className="text-zinc-400">{competition.year}</span>
             </div>
 
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            <h2 id={titleId} className="text-xl sm:text-2xl font-bold tracking-tight text-white">
               {competition.name}
             </h2>
             <p className="text-sm text-zinc-400 mt-1">{competition.organizer}</p>
@@ -125,6 +138,8 @@ export default function CompetitionModal({
                   : 'border-white/10 text-zinc-400 hover:text-white hover:border-white/30'
               }`}
               title="Bookmark"
+              aria-label={isBookmarked ? 'Remove bookmark' : 'Add bookmark'}
+              aria-pressed={isBookmarked}
             >
               <Bookmark className="w-4 h-4 fill-current" />
             </button>
@@ -132,13 +147,15 @@ export default function CompetitionModal({
               onClick={handleShare}
               className="p-2 border border-white/10 text-zinc-400 hover:text-white hover:border-white/30 transition-colors"
               title="Share"
+              aria-label="Share"
             >
               <Share2 className="w-4 h-4" />
             </button>
             <button
-              onClick={onClose}
+              onClick={() => dialogRef.current?.close()}
               className="p-2 border border-white/10 text-zinc-400 hover:text-white hover:border-white/30 transition-colors"
               title="Close"
+              aria-label="Close"
             >
               <X className="w-4 h-4" />
             </button>
@@ -295,6 +312,6 @@ export default function CompetitionModal({
           </div>
         </div>
       </div>
-    </div>
+    </dialog>
   );
 }

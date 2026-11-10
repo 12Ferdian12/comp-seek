@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useSyncExternalStore } from 'react';
 import { Competition, FilterFee, FilterField, FilterParticipation, FilterStatus, SelectedSheet } from '@/lib/types';
 import { isCompetitionActive, isFreeCompetition, matchesParticipation } from '@/lib/filters';
 import CompetitionCard from './CompetitionCard';
@@ -22,6 +22,40 @@ interface Props {
   initialCompetitions: Competition[];
 }
 
+const EMPTY_BOOKMARKS: string[] = [];
+
+function subscribeStorage(callback: () => void) {
+  window.addEventListener('storage', callback);
+  return () => window.removeEventListener('storage', callback);
+}
+
+function getBookmarksSnapshot(): string {
+  try {
+    return localStorage.getItem('comp_bookmarks') || '';
+  } catch {
+    return '';
+  }
+}
+
+function getServerSnapshot(): string {
+  return '';
+}
+
+let clientClockSnapshot = 0;
+
+function getMountedSnapshot(): number {
+  if (clientClockSnapshot === 0) clientClockSnapshot = Date.now();
+  return clientClockSnapshot;
+}
+
+function getMountedServerSnapshot(): number {
+  return 0;
+}
+
+function subscribeNoop() {
+  return () => {};
+}
+
 export default function CompetitionDashboard({ initialCompetitions }: Props) {
   const [selectedSheet, setSelectedSheet] = useState<SelectedSheet>('All');
   const [search, setSearch] = useState('');
@@ -32,47 +66,39 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
   const [savedOnly, setSavedOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'deadline' | 'name' | 'year'>('deadline');
   const [selectedComp, setSelectedComp] = useState<Competition | null>(null);
-  const [bookmarks, setBookmarks] = useState<string[]>([]);
-  const [currentTime, setCurrentTime] = useState<number | null>(null);
 
-  useEffect(() => {
-    setCurrentTime(Date.now());
-  }, []);
+  // External store holds clock read out-of-band: pure render, no SSR mismatch, no effect cascade.
+  const mountedClock = useSyncExternalStore(subscribeNoop, getMountedSnapshot, getMountedServerSnapshot);
+  const mountedNow = mountedClock > 0 ? mountedClock : null;
 
-  // Sync bookmarks from localStorage
-  useEffect(() => {
+  const rawBookmarks = useSyncExternalStore(subscribeStorage, getBookmarksSnapshot, getServerSnapshot);
+  const [localBookmarks, setLocalBookmarks] = useState<string[] | null>(null);
+
+  const bookmarks = useMemo(() => {
+    if (localBookmarks !== null) return localBookmarks;
+    if (!rawBookmarks) return EMPTY_BOOKMARKS;
     try {
-      const saved = localStorage.getItem('comp_bookmarks');
-      if (saved) {
-        const validIds = new Set(initialCompetitions.map((competition) => competition.id));
-        const stored = JSON.parse(saved);
-        const validBookmarks = Array.isArray(stored)
-          ? stored.filter((id): id is string => typeof id === 'string' && validIds.has(id))
-          : [];
-        setBookmarks(validBookmarks);
-        localStorage.setItem('comp_bookmarks', JSON.stringify(validBookmarks));
-      }
+      const parsed = JSON.parse(rawBookmarks);
+      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : EMPTY_BOOKMARKS;
     } catch {
-      // ignore storage access issues
+      return EMPTY_BOOKMARKS;
     }
-  }, []);
+  }, [rawBookmarks, localBookmarks]);
 
   const toggleBookmark = (id: string) => {
-    setBookmarks((prev) => {
-      const next = prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id];
-      try {
-        localStorage.setItem('comp_bookmarks', JSON.stringify(next));
-      } catch {
-        // ignore
-      }
-      return next;
-    });
+    const next = bookmarks.includes(id) ? bookmarks.filter((item) => item !== id) : [...bookmarks, id];
+    setLocalBookmarks(next);
+    try {
+      localStorage.setItem('comp_bookmarks', JSON.stringify(next));
+    } catch {
+      // ignore
+    }
   };
 
   // Filter & sort competitions
   const filtered = useMemo(() => {
     return initialCompetitions
-      .filter((comp) => currentTime === null || isCompetitionActive(comp, currentTime))
+      .filter((comp) => !mountedNow || isCompetitionActive(comp, mountedNow))
       .filter((comp) => {
         // Sheet category filter
         if (selectedSheet !== 'All' && comp.sheetCategory !== selectedSheet) {
@@ -127,12 +153,12 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
         if (sortBy === 'year') {
           return (b.year || '').localeCompare(a.year || '');
         }
-        // Deadline sorting: ISO date matching
-        const aDate = a.deadline.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0] || '9999-99-99';
-        const bDate = b.deadline.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0] || '9999-99-99';
+        // Deadline sorting: unknown dates last
+        const aDate = a.deadlineDate || '9999-99-99';
+        const bDate = b.deadlineDate || '9999-99-99';
         return aDate.localeCompare(bDate);
       });
-  }, [initialCompetitions, selectedSheet, search, fieldFilter, statusFilter, feeFilter, participationFilter, savedOnly, sortBy, bookmarks, currentTime]);
+  }, [initialCompetitions, selectedSheet, search, fieldFilter, statusFilter, feeFilter, participationFilter, savedOnly, sortBy, bookmarks, mountedNow]);
 
   const sheetUrl = useMemo(() => {
     if (selectedSheet === 'CS-Competition') {
@@ -168,7 +194,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
           <div className="flex items-center gap-3">
             <div className="w-3 h-3 bg-[#A4FF01]" />
             <span className="font-mono text-sm tracking-widest uppercase font-bold text-white">
-              COMP-SEEK <span className="text-[#A4FF01]">//</span> RADAR
+              COMP-SEEK <span className="text-[#A4FF01]">{'//'}</span> RADAR
             </span>
           </div>
 
@@ -274,7 +300,8 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
-                type="text"
+                type="search"
+                aria-label="Cari kompetisi"
                 placeholder="Cari nama lomba, organizer, topik riset, atau keyword..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -295,6 +322,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
                 <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-400" />
                 <span className="text-zinc-500">SORT:</span>
                 <select
+                  aria-label="Urutkan kompetisi"
                   value={sortBy}
                   onChange={(e) => setSortBy(e.target.value as 'deadline' | 'name' | 'year')}
                   className="bg-transparent text-white focus:outline-none cursor-pointer"
@@ -429,6 +457,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
                 onSelect={setSelectedComp}
                 isBookmarked={bookmarks.includes(comp.id)}
                 onToggleBookmark={toggleBookmark}
+                now={mountedNow}
               />
             ))}
           </div>

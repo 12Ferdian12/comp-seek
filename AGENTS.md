@@ -35,7 +35,7 @@ Data source is a public Google Spreadsheet via CSV export.
   `https://docs.google.com/spreadsheets/d/1xq0oASCqNLyXxE5-GaqQp4ZQgPhhRrtDIZLhtldu-70/export?format=csv&gid=2117962469`
 - Fetch inside Next.js with:
   `fetch(CSV_URL, { next: { revalidate: 3600, tags: ['sheet-data'] } })`
-- Mapping: Strip extra spaces, normalize status (`Open`, `Upcoming`, `Closed`), parse ISO dates or fallbacks.
+- Mapping: Strip extra spaces, normalize status (`Open`, `Upcoming`, `Closed`; Closed rows dropped), parse ISO deadline once into `deadlineDate`.
 - Filter out empty rows (where `Competition Name` is missing).
 
 ## 4. UI/UX Rules (Architecture Aesthetic)
