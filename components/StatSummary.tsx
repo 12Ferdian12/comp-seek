@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Competition, SelectedSheet } from '@/lib/types';
+import { Competition, SelectedSheet, SheetCategory } from '@/lib/types';
 import { Terminal, Cpu, BookOpen, Layers } from 'lucide-react';
 
 interface Props {
@@ -9,13 +9,23 @@ interface Props {
   selectedSheet: SelectedSheet;
 }
 
-export default function StatSummary({ competitions, selectedSheet }: Props) {
-  const total = competitions.length;
-  const csCount = competitions.filter((c) => c.sheetCategory === 'CS-Competition').length;
-  const csxeeCount = competitions.filter((c) => c.sheetCategory === 'CSxEE-Competition').length;
-  const paperCount = competitions.filter((c) => c.sheetCategory === 'Paper-Competition').length;
+function hasSheet(comp: Competition, sheet: SheetCategory): boolean {
+  return comp.sheetCategories?.length
+    ? comp.sheetCategories.includes(sheet)
+    : comp.sheetCategory === sheet;
+}
 
-  const openCount = competitions.filter((c) => c.status === 'Open').length;
+export default function StatSummary({ competitions, selectedSheet }: Props) {
+  const scoped =
+    selectedSheet === 'All'
+      ? competitions
+      : competitions.filter((c) => hasSheet(c, selectedSheet));
+  const total = scoped.length;
+  const openCount = scoped.filter((c) => c.status === 'Open').length;
+
+  const csCount = competitions.filter((c) => hasSheet(c, 'CS-Competition')).length;
+  const csxeeCount = competitions.filter((c) => hasSheet(c, 'CSxEE-Competition')).length;
+  const paperCount = competitions.filter((c) => hasSheet(c, 'Paper-Competition')).length;
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-px bg-white/10 border border-white/10 p-px">

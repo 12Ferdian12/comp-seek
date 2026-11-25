@@ -3,6 +3,7 @@ export type SheetCategory = 'CS-Competition' | 'CSxEE-Competition' | 'Paper-Comp
 export interface Competition {
   id: string;
   sheetCategory: SheetCategory;
+  sheetCategories: SheetCategory[];
   name: string;
   organizer: string;
   category: string;
@@ -34,7 +35,7 @@ export interface Competition {
 }
 
 export type FilterField = 'All' | 'Informatika' | 'Elektro' | 'Both';
-export type FilterStatus = 'All' | 'Open' | 'Upcoming';
+export type FilterStatus = 'All' | 'Open' | 'Upcoming' | 'Past';
 export type FilterFee = 'All' | 'Free';
 export type FilterParticipation = 'All' | 'Individual' | 'Team';
 export type SelectedSheet = 'All' | SheetCategory;

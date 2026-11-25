@@ -1,7 +1,15 @@
 'use client';
 
 import React, { useState, useMemo, useSyncExternalStore } from 'react';
-import { Competition, FilterFee, FilterField, FilterParticipation, FilterStatus, SelectedSheet } from '@/lib/types';
+import {
+  Competition,
+  FilterFee,
+  FilterField,
+  FilterParticipation,
+  FilterStatus,
+  SelectedSheet,
+  SheetCategory,
+} from '@/lib/types';
 import { isCompetitionActive, isFreeCompetition, matchesParticipation } from '@/lib/filters';
 import CompetitionCard from './CompetitionCard';
 import CompetitionModal from './CompetitionModal';
@@ -15,7 +23,7 @@ import {
   Terminal,
   Cpu,
   BookOpen,
-  LayoutGrid
+  LayoutGrid,
 } from 'lucide-react';
 
 interface Props {
@@ -23,6 +31,12 @@ interface Props {
 }
 
 const EMPTY_BOOKMARKS: string[] = [];
+
+function hasSheet(comp: Competition, sheet: SheetCategory): boolean {
+  return comp.sheetCategories?.length
+    ? comp.sheetCategories.includes(sheet)
+    : comp.sheetCategory === sheet;
+}
 
 function subscribeStorage(callback: () => void) {
   window.addEventListener('storage', callback);
@@ -85,8 +99,12 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
     }
   }, [rawBookmarks, localBookmarks]);
 
+  const validIdSet = useMemo(() => new Set(initialCompetitions.map((c) => c.id)), [initialCompetitions]);
+  const activeBookmarks = useMemo(() => bookmarks.filter((id) => validIdSet.has(id)), [bookmarks, validIdSet]);
+
   const toggleBookmark = (id: string) => {
-    const next = bookmarks.includes(id) ? bookmarks.filter((item) => item !== id) : [...bookmarks, id];
+    const base = bookmarks.filter((item) => validIdSet.has(item));
+    const next = base.includes(id) ? base.filter((item) => item !== id) : [...base, id];
     setLocalBookmarks(next);
     try {
       localStorage.setItem('comp_bookmarks', JSON.stringify(next));
@@ -95,13 +113,29 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
     }
   };
 
+  const activeCompetitions = useMemo(
+    () => (!mountedNow ? initialCompetitions : initialCompetitions.filter((c) => isCompetitionActive(c, mountedNow))),
+    [initialCompetitions, mountedNow]
+  );
+
+  const pastCompetitions = useMemo(
+    () => (!mountedNow ? [] : initialCompetitions.filter((c) => !isCompetitionActive(c, mountedNow))),
+    [initialCompetitions, mountedNow]
+  );
+
+  const pool = statusFilter === 'Past' ? pastCompetitions : activeCompetitions;
+
+  const scopedTotal = useMemo(
+    () => (selectedSheet === 'All' ? pool.length : pool.filter((c) => hasSheet(c, selectedSheet)).length),
+    [pool, selectedSheet]
+  );
+
   // Filter & sort competitions
   const filtered = useMemo(() => {
-    return initialCompetitions
-      .filter((comp) => !mountedNow || isCompetitionActive(comp, mountedNow))
+    return pool
       .filter((comp) => {
         // Sheet category filter
-        if (selectedSheet !== 'All' && comp.sheetCategory !== selectedSheet) {
+        if (selectedSheet !== 'All' && !hasSheet(comp, selectedSheet)) {
           return false;
         }
 
@@ -125,7 +159,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
         }
 
         // Status filter
-        if (statusFilter !== 'All') {
+        if (statusFilter === 'Open' || statusFilter === 'Upcoming') {
           if (comp.status !== statusFilter) return false;
         }
 
@@ -141,7 +175,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
 
         // Bookmark filter
         if (savedOnly) {
-          if (!bookmarks.includes(comp.id)) return false;
+          if (!activeBookmarks.includes(comp.id)) return false;
         }
 
         return true;
@@ -158,7 +192,18 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
         const bDate = b.deadlineDate || '9999-99-99';
         return aDate.localeCompare(bDate);
       });
-  }, [initialCompetitions, selectedSheet, search, fieldFilter, statusFilter, feeFilter, participationFilter, savedOnly, sortBy, bookmarks, mountedNow]);
+  }, [
+    pool,
+    selectedSheet,
+    search,
+    fieldFilter,
+    statusFilter,
+    feeFilter,
+    participationFilter,
+    savedOnly,
+    sortBy,
+    activeBookmarks,
+  ]);
 
   const sheetUrl = useMemo(() => {
     if (selectedSheet === 'CS-Competition') {
@@ -174,17 +219,37 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
   }, [selectedSheet]);
 
   const csCount = useMemo(
-    () => initialCompetitions.filter((c) => c.sheetCategory === 'CS-Competition').length,
-    [initialCompetitions]
+    () => activeCompetitions.filter((c) => hasSheet(c, 'CS-Competition')).length,
+    [activeCompetitions]
   );
   const csxeeCount = useMemo(
-    () => initialCompetitions.filter((c) => c.sheetCategory === 'CSxEE-Competition').length,
-    [initialCompetitions]
+    () => activeCompetitions.filter((c) => hasSheet(c, 'CSxEE-Competition')).length,
+    [activeCompetitions]
   );
   const paperCount = useMemo(
-    () => initialCompetitions.filter((c) => c.sheetCategory === 'Paper-Competition').length,
-    [initialCompetitions]
+    () => activeCompetitions.filter((c) => hasSheet(c, 'Paper-Competition')).length,
+    [activeCompetitions]
   );
+
+  const resetAllFilters = () => {
+    setSearch('');
+    setFieldFilter('All');
+    setStatusFilter('All');
+    setFeeFilter('All');
+    setParticipationFilter('All');
+    setSavedOnly(false);
+  };
+
+  const hasActiveFilters = Boolean(
+    search ||
+      fieldFilter !== 'All' ||
+      statusFilter !== 'All' ||
+      feeFilter !== 'All' ||
+      participationFilter !== 'All' ||
+      savedOnly
+  );
+
+  const isEmptyBookmarksState = savedOnly && activeBookmarks.length === 0;
 
   return (
     <div className="min-h-screen bg-[#040506] text-zinc-100 flex flex-col grid-blueprint">
@@ -203,6 +268,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
               href={sheetUrl}
               target="_blank"
               rel="noreferrer"
+              aria-label="Open Google Spreadsheet in new tab"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono bg-white/5 border border-white/10 text-zinc-300 hover:text-white hover:border-[#A4FF01]/50 transition-colors"
             >
               <span className="hidden sm:inline">OPEN SHEET TAB</span>
@@ -231,7 +297,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
 
           {/* Metric Stats */}
           <div className="mt-8">
-            <StatSummary competitions={initialCompetitions} selectedSheet={selectedSheet} />
+            <StatSummary competitions={activeCompetitions} selectedSheet={selectedSheet} />
           </div>
         </div>
       </section>
@@ -249,7 +315,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
               }`}
             >
               <LayoutGrid className="w-3.5 h-3.5" />
-              <span>ALL SPREADSHEETS ({initialCompetitions.length})</span>
+              <span>ALL SPREADSHEETS ({activeCompetitions.length})</span>
             </button>
 
             <button
@@ -300,12 +366,13 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
             <div className="relative flex-1">
               <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
-                type="search"
+                type="text"
+                inputMode="search"
                 aria-label="Cari kompetisi"
                 placeholder="Cari nama lomba, organizer, topik riset, atau keyword..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full bg-[#090D12] border border-white/10 text-white placeholder-zinc-500 pl-10 pr-4 py-2.5 text-sm font-sans focus:outline-none focus:border-[#A4FF01] transition-colors"
+                className="w-full bg-[#090D12] border border-white/10 text-white placeholder-zinc-500 pl-10 pr-16 py-2.5 text-sm font-sans focus:outline-none focus:border-[#A4FF01] transition-colors"
               />
               {search && (
                 <button
@@ -317,7 +384,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-2 bg-[#090D12] border border-white/10 px-3 py-2 text-xs font-mono">
                 <SlidersHorizontal className="w-3.5 h-3.5 text-zinc-400" />
                 <span className="text-zinc-500">SORT:</span>
@@ -341,19 +408,19 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
 
               <button
                 onClick={() => setSavedOnly(!savedOnly)}
-                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-mono border transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-2 text-xs font-mono border transition-colors whitespace-nowrap ${
                   savedOnly
                     ? 'border-[#A4FF01] text-[#A4FF01] bg-[#A4FF01]/10'
                     : 'border-white/10 text-zinc-400 hover:text-white'
                 }`}
               >
                 <Bookmark className="w-3.5 h-3.5 fill-current" />
-                <span>BOOKMARKED ({bookmarks.length})</span>
+                <span>BOOKMARKED ({activeBookmarks.length})</span>
               </button>
             </div>
           </div>
 
-          {/* Field & Status Pill Tabs */}
+          {/* Field, Status, Format & Fee Pill Tabs */}
           <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
             {/* Field Filters */}
             <div className="flex flex-wrap items-center gap-1.5">
@@ -375,51 +442,80 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
               ))}
             </div>
 
-            {/* Status Filters */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider mr-1">
-                STATUS:
-              </span>
-              {(['All', 'Open', 'Upcoming'] as FilterStatus[]).map((s) => (
+            {/* Status, Format & Fee Filters */}
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Status Filters */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider mr-1">
+                  STATUS:
+                </span>
+                {(['All', 'Open', 'Upcoming'] as FilterStatus[]).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStatusFilter(s)}
+                    className={`px-3 py-1 text-xs font-mono border transition-colors ${
+                      statusFilter === s
+                        ? s === 'Open'
+                          ? 'border-[#A4FF01] text-[#A4FF01] bg-[#A4FF01]/10 font-bold'
+                          : s === 'Upcoming'
+                          ? 'border-sky-400 text-sky-400 bg-sky-400/10 font-bold'
+                          : 'border-zinc-500 text-white bg-zinc-800 font-bold'
+                        : 'border-white/10 text-zinc-400 hover:border-white/30 hover:text-white bg-[#090D12]'
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+                {pastCompetitions.length > 0 && (
+                  <button
+                    onClick={() => setStatusFilter('Past')}
+                    className={`px-3 py-1 text-xs font-mono border transition-colors ${
+                      statusFilter === 'Past'
+                        ? 'border-rose-400/70 text-rose-300 bg-rose-500/15 font-bold'
+                        : 'border-white/10 text-zinc-400 hover:border-white/30 hover:text-white bg-[#090D12]'
+                    }`}
+                  >
+                    Past ({pastCompetitions.length})
+                  </button>
+                )}
+              </div>
+
+              {/* Format Filters */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider mr-1">
+                  FORMAT:
+                </span>
+                {(['All', 'Individual', 'Team'] as FilterParticipation[]).map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => setParticipationFilter(p)}
+                    className={`px-3 py-1 text-xs font-mono border transition-colors ${
+                      participationFilter === p
+                        ? 'border-sky-400 text-sky-300 bg-sky-400/10 font-bold'
+                        : 'border-white/10 text-zinc-400 hover:border-white/30 hover:text-white bg-[#090D12]'
+                    }`}
+                  >
+                    {p === 'All' ? 'ALL FORMAT' : p.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+
+              {/* Fee Filter */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider mr-1">
+                  FEE:
+                </span>
                 <button
-                  key={s}
-                  onClick={() => setStatusFilter(s)}
+                  onClick={() => setFeeFilter(feeFilter === 'Free' ? 'All' : 'Free')}
                   className={`px-3 py-1 text-xs font-mono border transition-colors ${
-                    statusFilter === s
-                      ? s === 'Open'
-                        ? 'border-[#A4FF01] text-[#A4FF01] bg-[#A4FF01]/10 font-bold'
-                        : s === 'Upcoming'
-                        ? 'border-sky-400 text-sky-400 bg-sky-400/10 font-bold'
-                        : 'border-zinc-500 text-white bg-zinc-800 font-bold'
+                    feeFilter === 'Free'
+                      ? 'border-[#A4FF01] text-black bg-[#A4FF01] font-bold'
                       : 'border-white/10 text-zinc-400 hover:border-white/30 hover:text-white bg-[#090D12]'
                   }`}
                 >
-                  {s}
+                  GRATIS
                 </button>
-              ))}
-              {(['All', 'Individual', 'Team'] as FilterParticipation[]).map((p) => (
-                <button
-                  key={p}
-                  onClick={() => setParticipationFilter(p)}
-                  className={`px-3 py-1 text-xs font-mono border transition-colors ${
-                    participationFilter === p
-                      ? 'border-sky-400 text-sky-300 bg-sky-400/10 font-bold'
-                      : 'border-white/10 text-zinc-400 hover:border-white/30 hover:text-white bg-[#090D12]'
-                  }`}
-                >
-                  {p === 'All' ? 'ALL FORMAT' : p.toUpperCase()}
-                </button>
-              ))}
-              <button
-                onClick={() => setFeeFilter(feeFilter === 'Free' ? 'All' : 'Free')}
-                className={`px-3 py-1 text-xs font-mono border transition-colors ${
-                  feeFilter === 'Free'
-                    ? 'border-[#A4FF01] text-black bg-[#A4FF01] font-bold'
-                    : 'border-white/10 text-zinc-400 hover:border-white/30 hover:text-white bg-[#090D12]'
-                }`}
-              >
-                GRATIS
-              </button>
+              </div>
             </div>
           </div>
         </div>
@@ -428,18 +524,11 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
         <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-6 font-mono text-xs text-zinc-400">
           <div>
             SHOWING <span className="text-[#A4FF01] font-bold">{filtered.length}</span> OF{' '}
-            <span className="text-white">{initialCompetitions.length}</span> COMPETITIONS
+            <span className="text-white">{scopedTotal}</span> COMPETITIONS
           </div>
-          {(search || fieldFilter !== 'All' || statusFilter !== 'All' || feeFilter !== 'All' || participationFilter !== 'All' || savedOnly) && (
+          {hasActiveFilters && (
             <button
-              onClick={() => {
-                setSearch('');
-                setFieldFilter('All');
-                setStatusFilter('All');
-                setFeeFilter('All');
-                setParticipationFilter('All');
-                setSavedOnly(false);
-              }}
+              onClick={resetAllFilters}
               className="text-[#A4FF01] hover:underline"
             >
               RESET ALL FILTERS
@@ -455,7 +544,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
                 key={comp.id}
                 competition={comp}
                 onSelect={setSelectedComp}
-                isBookmarked={bookmarks.includes(comp.id)}
+                isBookmarked={activeBookmarks.includes(comp.id)}
                 onToggleBookmark={toggleBookmark}
                 now={mountedNow}
               />
@@ -464,21 +553,25 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
         ) : (
           <div className="p-12 text-center border border-dashed border-white/15 bg-[#090D12]">
             <p className="font-mono text-sm text-zinc-400">
-              Tidak ada kompetisi yang cocok dengan kriteria filter saat ini.
+              {isEmptyBookmarksState
+                ? 'Belum ada kompetisi yang disimpan. Klik ikon bookmark pada kartu kompetisi untuk menyimpannya.'
+                : 'Tidak ada kompetisi yang cocok dengan kriteria filter saat ini.'}
             </p>
-            <button
-              onClick={() => {
-                setSearch('');
-                setFieldFilter('All');
-                setStatusFilter('All');
-                setFeeFilter('All');
-                setParticipationFilter('All');
-                setSavedOnly(false);
-              }}
-              className="mt-4 px-4 py-2 text-xs font-mono border border-[#A4FF01] text-[#A4FF01] hover:bg-[#A4FF01]/10 transition-colors"
-            >
-              RESET FILTER
-            </button>
+            {isEmptyBookmarksState ? (
+              <button
+                onClick={() => setSavedOnly(false)}
+                className="mt-4 px-4 py-2 text-xs font-mono border border-[#A4FF01] text-[#A4FF01] hover:bg-[#A4FF01]/10 transition-colors"
+              >
+                LIHAT SEMUA KOMPETISI
+              </button>
+            ) : (
+              <button
+                onClick={resetAllFilters}
+                className="mt-4 px-4 py-2 text-xs font-mono border border-[#A4FF01] text-[#A4FF01] hover:bg-[#A4FF01]/10 transition-colors"
+              >
+                RESET FILTER
+              </button>
+            )}
           </div>
         )}
       </main>
@@ -499,7 +592,7 @@ export default function CompetitionDashboard({ initialCompetitions }: Props) {
       <CompetitionModal
         competition={selectedComp}
         onClose={() => setSelectedComp(null)}
-        isBookmarked={selectedComp ? bookmarks.includes(selectedComp.id) : false}
+        isBookmarked={selectedComp ? activeBookmarks.includes(selectedComp.id) : false}
         onToggleBookmark={toggleBookmark}
       />
     </div>

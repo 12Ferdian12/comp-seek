@@ -23,6 +23,10 @@ export default function CompetitionCard({
     ? getDaysLeft(competition.deadlineDate, now)
     : null;
 
+  const categories = competition.sheetCategories?.length
+    ? competition.sheetCategories
+    : [competition.sheetCategory];
+
   return (
     <div
       role="button"
@@ -38,24 +42,27 @@ export default function CompetitionCard({
       className="group relative bg-[#090D12] border border-white/10 hover:border-[#A4FF01]/60 p-5 flex flex-col justify-between transition-all duration-200 cursor-pointer hover:shadow-[0_0_20px_rgba(164,255,1,0.06)]"
     >
       <div>
-        {/* Top Header: Sheet Category + Status + Bookmark */}
+        {/* Top Header: Sheet Categories + Status + Bookmark */}
         <div className="flex items-center justify-between gap-2 mb-3">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span
-              className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 border ${
-                competition.sheetCategory === 'CS-Competition'
-                  ? 'border-cyan-500/40 text-cyan-300 bg-cyan-950/40'
-                  : competition.sheetCategory === 'CSxEE-Competition'
-                  ? 'border-[#A4FF01]/40 text-[#A4FF01] bg-[#A4FF01]/10'
-                  : 'border-amber-500/40 text-amber-300 bg-amber-950/40'
-              }`}
-            >
-              {competition.sheetCategory === 'CS-Competition'
-                ? 'CS'
-                : competition.sheetCategory === 'CSxEE-Competition'
-                ? 'CS × EE'
-                : 'PAPER'}
-            </span>
+            {categories.map((cat) => (
+              <span
+                key={cat}
+                className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 border ${
+                  cat === 'CS-Competition'
+                    ? 'border-cyan-500/40 text-cyan-300 bg-cyan-950/40'
+                    : cat === 'CSxEE-Competition'
+                    ? 'border-[#A4FF01]/40 text-[#A4FF01] bg-[#A4FF01]/10'
+                    : 'border-amber-500/40 text-amber-300 bg-amber-950/40'
+                }`}
+              >
+                {cat === 'CS-Competition'
+                  ? 'CS'
+                  : cat === 'CSxEE-Competition'
+                  ? 'CS × EE'
+                  : 'PAPER'}
+              </span>
+            ))}
 
             <span
               className={`text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 border ${
@@ -110,9 +117,11 @@ export default function CompetitionCard({
         </div>
 
         {/* Topics excerpt */}
-        <p className="text-xs text-zinc-300 mt-3 line-clamp-2 leading-relaxed bg-black/40 p-2.5 border border-white/5 font-mono">
-          {competition.topics}
-        </p>
+        <div className="mt-3 bg-black/40 p-2.5 border border-white/5">
+          <p className="text-xs text-zinc-300 line-clamp-2 leading-relaxed font-mono">
+            {competition.topics || competition.category}
+          </p>
+        </div>
       </div>
 
       {/* Meta Specs & Deadline */}
@@ -123,19 +132,24 @@ export default function CompetitionCard({
             <Calendar className="w-3.5 h-3.5 text-zinc-400" />
             <span>Deadline:</span>
           </div>
-          <div className="text-right">
-            <span className="text-white font-medium">
-              {competition.deadline.slice(0, 16) || 'TBA'}
+          <div className="flex items-center justify-end gap-2">
+            <span
+              className="text-white font-medium truncate max-w-[140px] inline-block align-bottom"
+              title={competition.deadline || 'TBA'}
+            >
+              {competition.deadlineDate || competition.deadline || 'TBA'}
             </span>
             {daysLeft !== null && (
               <span
-                className={`ml-2 text-[10px] px-1.5 py-0.2 border ${
-                  daysLeft <= 0
-                    ? 'border-rose-500 text-rose-400 bg-rose-500/10'
+                className={`text-[10px] px-1.5 py-0.5 border shrink-0 ${
+                  daysLeft < 0
+                    ? 'border-zinc-700 text-zinc-400 bg-zinc-900'
+                    : daysLeft === 0
+                    ? 'border-rose-500 text-rose-300 bg-rose-500/20 font-bold'
                     : daysLeft <= 7
-                    ? 'border-amber-400 text-amber-300 bg-amber-400/10'
+                    ? 'border-orange-500 text-orange-300 bg-orange-500/15 font-semibold'
                     : daysLeft <= 30
-                    ? 'border-amber-400 text-amber-300 bg-amber-400/10'
+                    ? 'border-amber-400/60 text-amber-300 bg-amber-400/10'
                     : 'border-[#A4FF01]/40 text-[#A4FF01] bg-[#A4FF01]/5'
                 }`}
               >
@@ -146,15 +160,17 @@ export default function CompetitionCard({
         </div>
 
         {/* Location & Prize */}
-        <div className="flex items-center justify-between text-xs text-zinc-400">
-          <div className="flex items-center gap-1.5 truncate max-w-[60%]">
+        <div className="flex items-center justify-between text-xs text-zinc-400 gap-2">
+          <div className="flex items-center gap-1.5 truncate max-w-[55%]">
             <MapPin className="w-3.5 h-3.5 shrink-0 text-zinc-500" />
             <span className="truncate">{competition.location}</span>
           </div>
-          {competition.prize && competition.prize !== '-' && (
+          {competition.prize && (
             <div className="flex items-center gap-1 text-amber-300/80 text-[11px] font-mono shrink-0">
               <Trophy className="w-3 h-3 text-amber-400" />
-              <span className="truncate max-w-[120px]">{competition.prize.slice(0, 16)}</span>
+              <span className="truncate max-w-[140px]" title={competition.prize}>
+                {competition.prize}
+              </span>
             </div>
           )}
         </div>
